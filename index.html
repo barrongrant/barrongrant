@@ -3,18 +3,26 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Image Display Website</title>
+    <title>Image Display and Combine</title>
     <script src="https://unpkg.com/@tailwindcss/browser@4"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
     <style>
         body {
             font-family: 'Inter', sans-serif;
         }
+        .combined-image-canvas {
+            border: 2px solid #ccc;
+            border-radius: 0.5rem;
+            margin-top: 1rem;
+            display: none;
+            max-width: 100%;
+            height: auto;
+        }
     </style>
 </head>
 <body class="bg-gray-100 p-8">
     <div class="container mx-auto bg-white rounded-lg shadow-md p-8">
-        <h1 class="text-3xl font-semibold text-blue-600 text-center mb-6">Image Display</h1>
+        <h1 class="text-3xl font-semibold text-blue-600 text-center mb-6">Image Display and Combine</h1>
         <div class="mb-6">
             <label for="imageUpload" class="inline-flex items-center justify-center px-5 py-3 bg-green-500 text-white font-medium rounded-md shadow-md cursor-pointer hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50 transition-colors">
                 <svg xmlns="http://www.w3.org/2000/svg" class="mr-2 w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -29,26 +37,43 @@
         </div>
         <div id="imageContainer" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
             </div>
+        <button id="combineButton" class="mt-6 w-full py-3 bg-blue-500 hover:bg-blue-600 text-white font-semibold rounded-md shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 transition-colors duration-300" style="display: none;">Combine Images Horizontally</button>
+        <canvas id="combinedCanvas" class="combined-image-canvas"></canvas>
+        <div id="downloadButtonContainer" class="mt-4 text-center" style="display: none;">
+            <a id="downloadButton" href="#" download="combined_image.jpg" class="inline-flex items-center justify-center px-5 py-3 bg-green-500 text-white font-medium rounded-md shadow-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50 transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" class="mr-2 w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-11-4l5-5m0 0l5 5m-5-5v12"/>
+                </svg>
+                <span>Download Combined Image</span>
+            </a>
+        </div>
     </div>
-
     <script>
         const imageUpload = document.getElementById('imageUpload');
         const imageContainer = document.getElementById('imageContainer');
         const fileCountDisplay = document.getElementById('fileCount');
         const fileSizeError = document.getElementById('fileSizeError');
         const generalError = document.getElementById('generalError');
+        const combineButton = document.getElementById('combineButton');
+        const combinedCanvas = document.getElementById('combinedCanvas');
+        const downloadButton = document.getElementById('downloadButton');
+        const downloadButtonContainer = document.getElementById('downloadButtonContainer');
+        const MAX_FILE_SIZE_KB = 2048;
 
-        const MAX_FILE_SIZE_KB = 2048; // 2MB
+        let uploadedImages = [];
 
         imageUpload.addEventListener('change', function(event) {
             const files = event.target.files;
-            imageContainer.innerHTML = ''; // Clear previous images
-            fileSizeError.style.display = 'none'; // Hide error message
+            imageContainer.innerHTML = '';
+            fileSizeError.style.display = 'none';
             generalError.style.display = 'none';
+            uploadedImages = [];
+            combineButton.style.display = 'none';
+            downloadButtonContainer.style.display = 'none';
 
             if (!files || files.length === 0) {
                 fileCountDisplay.textContent = '';
-                return; // Exit if no files are selected
+                return;
             }
 
             let totalSizeKB = 0;
@@ -58,16 +83,16 @@
                 totalSizeKB += file.size / 1024;
 
                 if (file.size > MAX_FILE_SIZE_KB * 1024) {
-                    fileSizeError.textContent = `File size exceeds the limit of ${MAX_FILE_SIZE_KB}KB: ${file.name}`;
+                    fileSizeError.textContent = `File exceeds ${MAX_FILE_SIZE_KB}KB: ${file.name}`;
                     fileSizeError.style.display = 'block';
-                    event.target.value = ''; // Clear the input
-                    return; // Stop processing files
+                    event.target.value = '';
+                    return;
                 }
                 validFiles.push(file);
             }
 
             if (totalSizeKB > MAX_FILE_SIZE_KB * 5) {
-                generalError.textContent = `Total size of selected images exceeds the limit of ${MAX_FILE_SIZE_KB * 5}KB. Please upload fewer images.`;
+                generalError.textContent = `Total size exceeds ${MAX_FILE_SIZE_KB * 5}KB.`;
                 generalError.style.display = 'block';
                 event.target.value = '';
                 return;
@@ -75,38 +100,99 @@
 
             fileCountDisplay.textContent = `Selected ${validFiles.length} image(s)`;
 
+            let imagesLoaded = 0;
             for (let i = 0; i < validFiles.length; i++) {
                 const file = validFiles[i];
                 const reader = new FileReader();
 
                 reader.onload = function(e) {
-                    const img = document.createElement('img');
-                    img.src = e.target.result;
-                    img.alt = `Uploaded Image ${i + 1}`;
-                    img.classList.add('rounded-md', 'shadow-lg', 'w-full', 'h-auto', 'object-cover');
-
-                    const imageWrapper = document.createElement('div');
-                    imageWrapper.classList.add('relative', 'group');
-                    imageWrapper.appendChild(img);
-
-                    const deleteButton = document.createElement('button');
-                    deleteButton.textContent = 'Delete'; // Changed to text for better icon
-                    deleteButton.classList.add('absolute', 'top-2', 'right-2', 'bg-red-500', 'text-white', 'rounded-md', 'px-3', 'py-1.5', 'opacity-0', 'group-hover:opacity-100', 'transition-opacity', 'text-sm', 'font-medium');
-                    deleteButton.addEventListener('click', function() {
-                        imageWrapper.remove(); // Remove the image wrapper
-                        const remainingImages = imageContainer.querySelectorAll('div'); //Count remaining images
-                        fileCountDisplay.textContent = `Selected ${remainingImages.length} image(s)`;
-                        if(remainingImages.length === 0){
-                            fileCountDisplay.textContent = '';
+                    const img = new Image();
+                    img.onload = () => {
+                        imagesLoaded++;
+                        uploadedImages.push(img);
+                        if (imagesLoaded === validFiles.length) {
+                            combineButton.style.display = 'block';
                         }
-                    });
-                    imageWrapper.appendChild(deleteButton);
-                    imageContainer.appendChild(imageWrapper);
+                        img.alt = `Uploaded Image ${i + 1}`;
+                        img.classList.add('rounded-md', 'shadow-lg', 'w-full', 'h-auto', 'object-cover');
+                        const imageWrapper = document.createElement('div');
+                        imageWrapper.classList.add('relative', 'group');
+                        imageWrapper.appendChild(img);
+
+                        const deleteButton = document.createElement('button');
+                        deleteButton.textContent = 'Delete';
+                        deleteButton.classList.add('absolute', 'top-2', 'right-2', 'bg-red-500', 'text-white', 'rounded-md', 'px-3', 'py-1.5', 'opacity-0', 'group-hover:opacity-100', 'transition-opacity', 'text-sm', 'font-medium');
+                        deleteButton.addEventListener('click', function() {
+                            imageWrapper.remove();
+                            const index = uploadedImages.indexOf(img);
+                            if (index > -1) {
+                                uploadedImages.splice(index, 1);
+                            }
+                            const remainingImages = imageContainer.querySelectorAll('div');
+                            fileCountDisplay.textContent = `Selected ${remainingImages.length} image(s)`;
+                            if (remainingImages.length === 0) {
+                                fileCountDisplay.textContent = '';
+                                combineButton.style.display = 'none';
+                                downloadButtonContainer.style.display = 'none';
+                            }
+                        });
+                        imageWrapper.appendChild(deleteButton);
+                        imageContainer.appendChild(imageWrapper);
+                    };
+                    img.src = e.target.result;
                 };
                 reader.readAsDataURL(file);
             }
-             // Clear the input to allow re-selection of the same files
             event.target.value = '';
+        });
+
+        combineButton.addEventListener('click', function() {
+            if (uploadedImages.length === 0) {
+                alert('No images to combine. Please upload images.');
+                return;
+            }
+
+            let smallestWidth = Infinity;
+            let smallestHeight = Infinity;
+
+            for (let i = 0; i < uploadedImages.length; i++) {
+                const img = uploadedImages[i];
+                if (img.width < smallestWidth) {
+                    smallestWidth = img.width;
+                }
+                if (img.height < smallestHeight) {
+                    smallestHeight = img.height;
+                }
+            }
+
+            const totalWidth = uploadedImages.length * smallestWidth;
+            combinedCanvas.width = totalWidth;
+            combinedCanvas.height = smallestHeight;
+            const ctx = combinedCanvas.getContext('2d');
+            ctx.clearRect(0, 0, combinedCanvas.width, combinedCanvas.height);
+
+            let xOffset = 0;
+            for (let i = 0; i < uploadedImages.length; i++) {
+                const img = uploadedImages[i];
+                const sourceX = Math.max(0, (img.width - smallestWidth) / 2);
+                const sourceY = Math.max(0, (img.height - smallestHeight) / 2);
+
+                ctx.drawImage(
+                    img,
+                    sourceX,
+                    sourceY,
+                    smallestWidth,
+                    smallestHeight,
+                    xOffset,
+                    0,
+                    smallestWidth,
+                    smallestHeight
+                );
+                xOffset += smallestWidth;
+            }
+            combinedCanvas.style.display = 'block';
+            downloadButtonContainer.style.display = 'block';
+            downloadButton.href = combinedCanvas.toDataURL('image/jpeg');
         });
     </script>
 </body>
